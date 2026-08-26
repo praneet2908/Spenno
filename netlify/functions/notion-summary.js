@@ -41,4 +41,4 @@ exports.handler = async (event) => {
     console.error('Function error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Server error' }) };
   }
-};
+}

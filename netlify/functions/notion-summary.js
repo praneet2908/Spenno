@@ -1,4 +1,3 @@
-// Queries the Notion database for this month's entries and returns total + list.
 exports.handler = async (event) => {
   try {
     const now = new Date();
@@ -23,15 +22,21 @@ exports.handler = async (event) => {
     }
 
     const entries = data.results.map(page => ({
+      id: page.id,
       name: page.properties.Name?.title?.[0]?.plain_text || 'Expense',
       amount: page.properties.Amount?.number || 0,
-      category: page.properties.Category?.select?.name || 'Other',
+      category: page.properties.Category?.multi_select?.[0]?.name || 'Other',
       date: page.properties.Date?.date?.start || ''
     }));
 
     const total = entries.reduce((sum, e) => sum + e.amount, 0);
 
-    return { statusCode: 200, body: JSON.stringify({ total, entries }) };
+    const byCategory = {};
+    entries.forEach(e => {
+      byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
+    });
+
+    return { statusCode: 200, body: JSON.stringify({ total, entries, byCategory }) };
   } catch (err) {
     console.error('Function error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: 'Server error' }) };

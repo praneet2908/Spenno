@@ -20,7 +20,7 @@ exports.handler = async (event) => {
         properties: {
           'Name': { title: [{ text: { content: note || category || 'Expense' } }] },
           'Amount': { number: parseFloat(amount) },
-          'Category': { select: { name: category || 'Other' } }
+          'Category': { multi_select: [{ name: category || 'Other' }] }
         }
       })
     });

@@ -86,9 +86,34 @@
   .toast.show{opacity:1;}
 
   .setup-note{background:#FFF8E8;border:1px solid #F2D98A;border-radius:12px;padding:14px 16px;font-size:13px;color:#7A5E12;margin-bottom:18px;line-height:1.5;}
+
+  .lock-screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px;}
+  .lock-icon{width:56px;height:56px;background:var(--violet);border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;margin-bottom:20px;}
+  .lock-title{font-family:'Sora';font-weight:800;font-size:20px;margin-bottom:6px;}
+  .lock-sub{color:var(--slate);font-size:14px;margin-bottom:28px;}
+  .pin-dots{display:flex;gap:14px;margin-bottom:28px;}
+  .pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);}
+  .pin-dot.filled{background:var(--violet);border-color:var(--violet);}
+  .pin-dot.error{background:var(--coral);border-color:var(--coral);}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,64px);gap:14px;}
+  .pin-key{width:64px;height:64px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);font-family:'Sora';font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .pin-key:active{background:var(--violet-light);}
+  .pin-key.empty{visibility:hidden;}
+  .lock-hint{margin-top:20px;font-size:12px;color:var(--slate);text-decoration:underline;cursor:pointer;background:none;border:none;}
 </style>
 </head>
 <body>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-icon"><i data-lucide="lock" style="width:26px;height:26px"></i></div>
+  <div class="lock-title" id="lockTitle">Enter PIN</div>
+  <div class="lock-sub" id="lockSub">to unlock Spenno</div>
+  <div class="pin-dots" id="pinDots">
+    <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+  </div>
+  <div class="pin-pad" id="pinPad"></div>
+  <button class="lock-hint" id="resetLink" onclick="resetPin()" style="display:none">Forgot PIN? Reset it</button>
+</div>
 
 <div class="wrap">
   <header>
@@ -369,6 +394,99 @@ async function loadSummary(){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW error:', e));
 }
+
+// --- PIN lock ---
+let pinEntry = '';
+let pinMode = localStorage.getItem('spenno_pin') ? 'unlock' : 'setup';
+let setupFirstPin = '';
+
+function renderPinPad(){
+  const pad = document.getElementById('pinPad');
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
+  pad.innerHTML = keys.map(k => {
+    if(k === '') return `<div class="pin-key empty"></div>`;
+    if(k === 'del') return `<button class="pin-key" onclick="pinBackspace()"><i data-lucide="delete" style="width:20px;height:20px"></i></button>`;
+    return `<button class="pin-key" onclick="pinPress('${k}')">${k}</button>`;
+  }).join('');
+  if(window.lucide) lucide.createIcons();
+}
+
+function updateDots(error){
+  const dots = document.querySelectorAll('#pinDots .pin-dot');
+  dots.forEach((d, i) => {
+    d.classList.toggle('filled', i < pinEntry.length && !error);
+    d.classList.toggle('error', !!error);
+  });
+}
+
+function pinPress(digit){
+  if(pinEntry.length >= 4) return;
+  pinEntry += digit;
+  updateDots();
+  if(pinEntry.length === 4) setTimeout(handlePinComplete, 150);
+}
+
+function pinBackspace(){
+  pinEntry = pinEntry.slice(0, -1);
+  updateDots();
+}
+
+function handlePinComplete(){
+  if(pinMode === 'setup'){
+    if(!setupFirstPin){
+      setupFirstPin = pinEntry;
+      pinEntry = '';
+      document.getElementById('lockTitle').textContent = 'Confirm PIN';
+      document.getElementById('lockSub').textContent = 'enter it again';
+      updateDots();
+    } else {
+      if(pinEntry === setupFirstPin){
+        localStorage.setItem('spenno_pin', pinEntry);
+        unlockApp();
+      } else {
+        updateDots(true);
+        showToast("PINs didn't match — try again", true);
+        setTimeout(() => {
+          setupFirstPin = '';
+          pinEntry = '';
+          document.getElementById('lockTitle').textContent = 'Set a PIN';
+          document.getElementById('lockSub').textContent = 'to protect your Spenno';
+          updateDots();
+        }, 500);
+      }
+    }
+  } else {
+    const saved = localStorage.getItem('spenno_pin');
+    if(pinEntry === saved){
+      unlockApp();
+    } else {
+      updateDots(true);
+      setTimeout(() => { pinEntry = ''; updateDots(); }, 400);
+    }
+  }
+}
+
+function unlockApp(){
+  document.getElementById('lockScreen').style.display = 'none';
+}
+
+function resetPin(){
+  if(confirm('Reset your PIN? You will need to set a new one.')){
+    localStorage.removeItem('spenno_pin');
+    location.reload();
+  }
+}
+
+function initLock(){
+  renderPinPad();
+  if(pinMode === 'setup'){
+    document.getElementById('lockTitle').textContent = 'Set a PIN';
+    document.getElementById('lockSub').textContent = 'to protect your Spenno';
+  } else {
+    document.getElementById('resetLink').style.display = 'block';
+  }
+}
+initLock();
 
 if(window.lucide) lucide.createIcons();
 loadSummary();

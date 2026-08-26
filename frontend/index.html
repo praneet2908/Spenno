@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Spenno — Fast expense logging, synced to Notion</title>
 <link rel="manifest" href="/manifest.json"/>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="manifest" href="/manifest.json"/>
 <link rel="icon" href="/icon-192.png" type="image/png"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.462.0/umd/lucide.min.js"></script>
 <style>
   :root{
@@ -17,6 +16,8 @@
     --violet:#5B4FE8;
     --violet-light:#EDEBFD;
     --mint:#2FBF8F;
+    --coral:#E8544A;
+    --coral-light:#FBEAE9;
     --slate:#767B85;
     --line:#E7E5DF;
     --ink:#14151A;
@@ -32,10 +33,23 @@
   .notion-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--slate);background:var(--card);border:1px solid var(--line);padding:6px 11px;border-radius:999px;}
   .notion-badge.connected{color:var(--mint);border-color:rgba(47,191,143,0.3);}
 
-  .total-card{background:var(--violet);color:#fff;border-radius:20px;padding:28px 24px;margin:20px 0;position:relative;overflow:hidden;}
+  .total-card{background:var(--violet);color:#fff;border-radius:20px;padding:28px 24px;margin:20px 0 14px;position:relative;overflow:hidden;}
   .total-label{font-size:13px;opacity:0.75;margin-bottom:6px;}
   .total-num{font-family:'Sora';font-size:38px;font-weight:800;}
   .total-sub{font-size:13px;opacity:0.7;margin-top:6px;}
+  .total-card.over-budget{background:var(--coral);}
+
+  .budget-row{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:18px;font-size:13px;color:var(--slate);}
+  .budget-row input{border:none;background:transparent;font-family:'Sora';font-weight:700;color:var(--ink);width:80px;outline:none;font-size:13px;}
+  .budget-warning{background:var(--coral-light);color:var(--coral);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:14px;display:none;align-items:center;gap:7px;}
+
+  .breakdown{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:18px;}
+  .breakdown-title{font-family:'Sora';font-weight:700;font-size:14px;margin-bottom:12px;}
+  .cat-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px;}
+  .cat-bar-label{width:78px;color:var(--slate);flex-shrink:0;}
+  .cat-bar-track{flex:1;background:var(--paper);border-radius:6px;height:8px;overflow:hidden;}
+  .cat-bar-fill{height:100%;background:var(--violet);border-radius:6px;}
+  .cat-bar-amt{font-family:'Sora';font-weight:700;font-size:12.5px;width:60px;text-align:right;flex-shrink:0;}
 
   .quick-add{background:var(--card);border-radius:18px;padding:22px;border:1px solid var(--line);margin-bottom:18px;}
   .form-title{font-family:'Sora';font-weight:700;font-size:15px;margin-bottom:16px;}
@@ -50,16 +64,25 @@
   .note-input:focus{border-color:var(--violet);}
   .add-btn{width:100%;background:var(--ink);color:#fff;border:none;padding:15px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Inter';}
   .add-btn:disabled{opacity:0.5;}
-  .add-btn.saving{background:var(--slate);}
 
   .recent-title{font-size:13px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:0.05em;margin:22px 0 10px;}
-  .entry{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line);}
-  .entry-left{display:flex;flex-direction:column;}
-  .entry-name{font-weight:600;font-size:14px;}
+  .entry{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line);gap:10px;}
+  .entry-left{display:flex;flex-direction:column;flex:1;min-width:0;}
+  .entry-name{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .entry-meta{font-size:12px;color:var(--slate);margin-top:2px;}
+  .entry-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
   .entry-amt{font-family:'Sora';font-weight:700;font-size:15px;}
+  .entry-actions{display:flex;gap:4px;}
+  .icon-btn{background:none;border:none;color:var(--slate);cursor:pointer;padding:5px;display:flex;opacity:0.55;border-radius:6px;}
+  .icon-btn:hover{opacity:1;background:var(--paper);}
+  .icon-btn.danger:hover{color:var(--coral);}
 
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity 0.2s;pointer-events:none;}
+  .edit-row{display:none;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center;}
+  .edit-row input{flex:1;padding:9px 10px;border-radius:8px;border:1.5px solid var(--violet);font-size:13px;outline:none;}
+  .edit-row select{padding:9px 8px;border-radius:8px;border:1.5px solid var(--line);font-size:13px;}
+  .edit-save{background:var(--violet);color:#fff;border:none;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:10;}
   .toast.show{opacity:1;}
 
   .setup-note{background:#FFF8E8;border:1px solid #F2D98A;border-radius:12px;padding:14px 16px;font-size:13px;color:#7A5E12;margin-bottom:18px;line-height:1.5;}
@@ -77,10 +100,22 @@
     Backend not connected yet — set NOTION_TOKEN and NOTION_DATABASE_ID as environment variables on Netlify, then redeploy.
   </div>
 
-  <div class="total-card">
+  <div class="total-card" id="totalCard">
     <div class="total-label">This month</div>
     <div class="total-num" id="totalNum">₹0</div>
     <div class="total-sub" id="totalSub">synced with Notion</div>
+  </div>
+
+  <div class="budget-row">
+    <i data-lucide="target" style="width:14px;height:14px"></i>
+    Monthly budget: ₹<input type="number" id="budgetInput" placeholder="not set"/>
+    <button class="icon-btn" onclick="saveBudget()" style="margin-left:auto"><i data-lucide="check" style="width:15px;height:15px"></i></button>
+  </div>
+  <div class="budget-warning" id="budgetWarning"><i data-lucide="alert-triangle" style="width:14px;height:14px"></i><span id="budgetWarningText"></span></div>
+
+  <div class="breakdown" id="breakdownCard" style="display:none">
+    <div class="breakdown-title">By category</div>
+    <div id="breakdownList"></div>
   </div>
 
   <div class="quick-add">
@@ -110,10 +145,12 @@
 
 <script>
 let selectedCat = 'Food';
+let currentData = { entries: [], byCategory: {} };
+const CATS = ['Food','Transport','Shopping','Bills','Other'];
 
-document.querySelectorAll('.cat-chip').forEach(chip => {
+document.querySelectorAll('#catRow .cat-chip').forEach(chip => {
   chip.addEventListener('click', () => {
-    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('#catRow .cat-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     selectedCat = chip.dataset.cat;
   });
@@ -134,6 +171,45 @@ function showToast(msg, isError){
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+function getBudget(){
+  return parseFloat(localStorage.getItem('spenno_budget') || '0');
+}
+function saveBudget(){
+  const val = document.getElementById('budgetInput').value;
+  localStorage.setItem('spenno_budget', val || '0');
+  showToast('Budget saved');
+  applyBudgetCheck();
+}
+
+function applyBudgetCheck(){
+  const budget = getBudget();
+  const total = currentData.total || 0;
+  const card = document.getElementById('totalCard');
+  const warning = document.getElementById('budgetWarning');
+  const warningText = document.getElementById('budgetWarningText');
+
+  if(!budget){
+    card.classList.remove('over-budget');
+    warning.style.display = 'none';
+    return;
+  }
+
+  const pct = (total / budget) * 100;
+  if(total > budget){
+    card.classList.add('over-budget');
+    warning.style.display = 'flex';
+    warningText.textContent = `₹${(total-budget).toLocaleString('en-IN')} over your ₹${budget.toLocaleString('en-IN')} budget`;
+  } else if(pct >= 80){
+    card.classList.remove('over-budget');
+    warning.style.display = 'flex';
+    warningText.textContent = `${Math.round(pct)}% of your ₹${budget.toLocaleString('en-IN')} budget used`;
+  } else {
+    card.classList.remove('over-budget');
+    warning.style.display = 'none';
+  }
+  if(window.lucide) lucide.createIcons();
+}
+
 async function addExpense(){
   const amountInput = document.getElementById('amountInput');
   const noteInput = document.getElementById('noteInput');
@@ -147,7 +223,6 @@ async function addExpense(){
   }
 
   btn.disabled = true;
-  btn.classList.add('saving');
   btn.innerHTML = 'Saving...';
 
   try {
@@ -157,7 +232,6 @@ async function addExpense(){
       body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value })
     });
     const data = await res.json();
-
     if(!res.ok) throw new Error(data.error || 'Failed to save');
 
     showToast('Added to Notion ✓');
@@ -168,10 +242,76 @@ async function addExpense(){
     showToast(err.message || 'Something went wrong', true);
   } finally {
     btn.disabled = false;
-    btn.classList.remove('saving');
     btn.innerHTML = '<i data-lucide="plus" style="width:17px;height:17px"></i>Add to Notion';
     if(window.lucide) lucide.createIcons();
   }
+}
+
+async function deleteEntry(pageId){
+  if(!confirm('Delete this expense?')) return;
+  try {
+    const res = await fetch('/.netlify/functions/notion-delete', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pageId })
+    });
+    if(!res.ok) throw new Error('Failed to delete');
+    showToast('Deleted');
+    loadSummary();
+  } catch(err){
+    showToast('Could not delete', true);
+  }
+}
+
+function startEdit(pageId){
+  document.querySelectorAll('.edit-row').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.entry').forEach(r => r.style.display = 'flex');
+  const editRow = document.getElementById('edit-'+pageId);
+  const entryRow = document.getElementById('entry-'+pageId);
+  entryRow.style.display = 'none';
+  editRow.style.display = 'flex';
+}
+
+async function saveEdit(pageId){
+  const amount = document.getElementById('editAmt-'+pageId).value;
+  const category = document.getElementById('editCat-'+pageId).value;
+  if(!amount || parseFloat(amount) <= 0){
+    showToast('Enter a valid amount', true);
+    return;
+  }
+  try {
+    const res = await fetch('/.netlify/functions/notion-edit', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pageId, amount, category })
+    });
+    if(!res.ok) throw new Error('Failed to save');
+    showToast('Updated ✓');
+    loadSummary();
+  } catch(err){
+    showToast('Could not update', true);
+  }
+}
+
+function renderBreakdown(byCategory){
+  const card = document.getElementById('breakdownCard');
+  const list = document.getElementById('breakdownList');
+  const entries = Object.entries(byCategory || {}).sort((a,b) => b[1]-a[1]);
+
+  if(!entries.length){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  const max = Math.max(...entries.map(e => e[1]));
+
+  list.innerHTML = entries.map(([cat, amt]) => `
+    <div class="cat-bar-row">
+      <div class="cat-bar-label">${cat}</div>
+      <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${(amt/max*100)}%"></div></div>
+      <div class="cat-bar-amt">₹${amt.toLocaleString('en-IN')}</div>
+    </div>
+  `).join('');
 }
 
 async function loadSummary(){
@@ -179,25 +319,43 @@ async function loadSummary(){
   try {
     const res = await fetch('/.netlify/functions/notion-summary');
     const data = await res.json();
-
     if(!res.ok) throw new Error(data.error || 'Connection failed');
 
+    currentData = data;
     document.getElementById('totalNum').textContent = '₹' + data.total.toLocaleString('en-IN');
     badge.innerHTML = '<i data-lucide="check-circle-2" style="width:13px;height:13px"></i>Connected';
     badge.classList.add('connected');
     document.getElementById('setupNote').style.display = 'none';
 
+    const savedBudget = getBudget();
+    if(savedBudget) document.getElementById('budgetInput').value = savedBudget;
+    applyBudgetCheck();
+    renderBreakdown(data.byCategory);
+
     const list = document.getElementById('entryList');
     if(!data.entries.length){
       list.innerHTML = '<div style="color:var(--slate);font-size:14px;padding:16px 0">No expenses logged yet this month.</div>';
     } else {
-      list.innerHTML = data.entries.slice(0,10).map(e => `
-        <div class="entry">
+      list.innerHTML = data.entries.slice(0,15).map(e => `
+        <div class="entry" id="entry-${e.id}">
           <div class="entry-left">
             <div class="entry-name">${e.name}</div>
             <div class="entry-meta">${e.category} · ${e.date}</div>
           </div>
-          <div class="entry-amt">₹${e.amount.toLocaleString('en-IN')}</div>
+          <div class="entry-right">
+            <div class="entry-amt">₹${e.amount.toLocaleString('en-IN')}</div>
+            <div class="entry-actions">
+              <button class="icon-btn" onclick="startEdit('${e.id}')"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
+              <button class="icon-btn danger" onclick="deleteEntry('${e.id}')"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="edit-row" id="edit-${e.id}">
+          <input type="number" id="editAmt-${e.id}" value="${e.amount}" placeholder="Amount"/>
+          <select id="editCat-${e.id}">
+            ${CATS.map(c => `<option value="${c}" ${c===e.category?'selected':''}>${c}</option>`).join('')}
+          </select>
+          <button class="edit-save" onclick="saveEdit('${e.id}')">Save</button>
         </div>
       `).join('');
     }
@@ -208,11 +366,12 @@ async function loadSummary(){
   if(window.lucide) lucide.createIcons();
 }
 
-if(window.lucide) lucide.createIcons();
-loadSummary();
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW error:', e));
 }
+
+if(window.lucide) lucide.createIcons();
+loadSummary();
 </script>
 </body>
 </html>

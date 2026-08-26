@@ -6,6 +6,8 @@
 <title>Spenno — Fast expense logging, synced to Notion</title>
 <link rel="manifest" href="/manifest.json"/>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json"/>
+<link rel="icon" href="/icon-192.png" type="image/png"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.462.0/umd/lucide.min.js"></script>
 <style>
   :root{
@@ -208,6 +210,9 @@ async function loadSummary(){
 
 if(window.lucide) lucide.createIcons();
 loadSummary();
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW error:', e));
+}
 </script>
 </body>
 </html>

@@ -119,6 +119,18 @@
   .pin-pad{display:grid;grid-template-columns:repeat(3,64px);gap:16px;}
   .pin-key{width:64px;height:64px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);font-family:'Sora';font-size:21px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);transition:transform 0.08s;}
   .pin-key:active{background:var(--violet-light);transform:scale(0.94);}
+
+  .settings-btn{background:none;border:none;color:var(--slate);cursor:pointer;padding:6px;display:flex;}
+  .settings-overlay{position:fixed;inset:0;background:rgba(20,21,26,0.5);z-index:90;display:none;align-items:flex-end;justify-content:center;}
+  .settings-sheet{background:var(--card);border-radius:22px 22px 0 0;padding:26px 22px 32px;width:100%;max-width:460px;box-shadow:0 -8px 30px rgba(0,0,0,0.15);}
+  .settings-title{font-family:'Sora';font-weight:800;font-size:18px;margin-bottom:4px;}
+  .settings-sub{color:var(--slate);font-size:13px;margin-bottom:20px;line-height:1.5;}
+  .settings-label{font-size:12px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;display:block;}
+  .settings-input{width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--line);font-size:14px;outline:none;margin-bottom:16px;font-family:'Inter';}
+  .settings-input:focus{border-color:var(--violet);}
+  .settings-save{width:100%;background:var(--ink);color:#fff;border:none;padding:15px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:10px;}
+  .settings-disconnect{width:100%;background:none;border:1.5px solid var(--coral);color:var(--coral);padding:13px;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;}
+  .settings-close{width:100%;background:none;border:none;color:var(--slate);padding:10px;font-size:13px;cursor:pointer;margin-top:6px;}
   .pin-key.empty{visibility:hidden;}
   .lock-hint{margin-top:20px;font-size:12px;color:var(--slate);text-decoration:underline;cursor:pointer;background:none;border:none;}
 
@@ -157,7 +169,10 @@
 <div class="wrap">
   <header>
     <div class="brand"><span class="brand-dot"></span>Spenno</div>
-    <div class="notion-badge" id="notionBadge"><i data-lucide="circle" style="width:8px;height:8px"></i>Checking...</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="notion-badge" id="notionBadge"><i data-lucide="circle" style="width:8px;height:8px"></i>Checking...</div>
+      <button class="settings-btn" onclick="openSettings()"><i data-lucide="settings" style="width:19px;height:19px"></i></button>
+    </div>
   </header>
 
   <div class="install-banner" id="installBanner">
@@ -187,6 +202,11 @@
   <div class="breakdown" id="breakdownCard" style="display:none">
     <div class="breakdown-title">By category</div>
     <div id="breakdownList"></div>
+  </div>
+
+  <div class="breakdown" id="trendCard" style="display:none">
+    <div class="breakdown-title">This month, day by day</div>
+    <div id="trendChart" style="display:flex;align-items:flex-end;gap:3px;height:70px"></div>
   </div>
 
   <div class="quick-add">
@@ -329,6 +349,76 @@ function applyBudgetCheck(){
   if(window.lucide) lucide.createIcons();
 }
 
+// --- Per-person Notion connection (each device can connect its own Notion) ---
+function getOwnCreds(){
+  const token = localStorage.getItem('spenno_own_token');
+  const databaseId = localStorage.getItem('spenno_own_db');
+  return (token && databaseId) ? { notionToken: token, databaseId } : null;
+}
+
+// NOTE: replace YOUR_CLIENT_ID below with the Client ID from your public
+// Notion integration once created.
+   const NOTION_OAUTH_CLIENT_ID = '3cad872b-594c-81e2-ae41-003741b91a25';
+
+function connectWithNotionOAuth(){
+  const redirectUri = encodeURIComponent(location.origin + '/.netlify/functions/notion-oauth-callback');
+  const authUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${NOTION_OAUTH_CLIENT_ID}&response_type=code&owner=user&redirect_uri=${redirectUri}`;
+  location.href = authUrl;
+}
+
+// Catch OAuth credentials returned in the URL hash after redirect back from Notion
+function checkOAuthReturn(){
+  if(location.hash.includes('notion_token=')){
+    const params = new URLSearchParams(location.hash.slice(1));
+    const token = params.get('notion_token');
+    const db = params.get('notion_db');
+    if(token && db){
+      localStorage.setItem('spenno_own_token', token);
+      localStorage.setItem('spenno_own_db', db);
+      history.replaceState(null, '', location.pathname);
+      showToast('Connected to your Notion ✓');
+    }
+  }
+  const url = new URL(location.href);
+  if(url.searchParams.has('oauth_error')){
+    showToast('Notion connection failed — try again', true);
+    history.replaceState(null, '', location.pathname);
+  }
+}
+checkOAuthReturn();
+
+function openSettings(){
+  const creds = getOwnCreds();
+  document.getElementById('disconnectBtn').style.display = creds ? 'block' : 'none';
+  document.getElementById('settingsSub').textContent = creds
+    ? "You're connected to your own Notion. Disconnect to switch to a different one."
+    : "Each person using Spenno connects their own Notion — your data stays completely separate from anyone else's.";
+  document.getElementById('settingsOverlay').style.display = 'flex';
+}
+function closeSettings(){
+  document.getElementById('settingsOverlay').style.display = 'none';
+}
+function saveOwnNotion(){
+  const token = document.getElementById('settingsToken').value.trim();
+  const db = document.getElementById('settingsDb').value.trim();
+  if(!token || !db){ showToast('Enter both fields', true); return; }
+  localStorage.setItem('spenno_own_token', token);
+  localStorage.setItem('spenno_own_db', db);
+  showToast('Connected to your Notion ✓');
+  closeSettings();
+  loadSummary();
+}
+function disconnectOwnNotion(){
+  if(!confirm('Disconnect your Notion? You can reconnect anytime.')) return;
+  localStorage.removeItem('spenno_own_token');
+  localStorage.removeItem('spenno_own_db');
+  document.getElementById('settingsToken').value = '';
+  document.getElementById('settingsDb').value = '';
+  showToast('Disconnected');
+  closeSettings();
+  loadSummary();
+}
+
 async function addExpense(){
   const amountInput = document.getElementById('amountInput');
   const noteInput = document.getElementById('noteInput');
@@ -345,13 +435,21 @@ async function addExpense(){
   btn.innerHTML = 'Saving...';
 
   try {
+    const ownCreds = getOwnCreds();
     const res = await fetch('/.netlify/functions/notion-add', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value })
+      body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value, ...ownCreds })
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Failed to save');
+
+    // Best-effort mirror to Google Sheets - never blocks the main save
+    fetch('/.netlify/functions/sheets-add', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value })
+    }).catch(() => {});
 
     showToast('Added to Notion ✓');
     amountInput.value = '';
@@ -369,10 +467,11 @@ async function addExpense(){
 async function deleteEntry(pageId){
   if(!confirm('Delete this expense?')) return;
   try {
+    const ownCreds = getOwnCreds();
     const res = await fetch('/.netlify/functions/notion-delete', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pageId })
+      body: JSON.stringify({ pageId, notionToken: ownCreds?.notionToken })
     });
     if(!res.ok) throw new Error('Failed to delete');
     showToast('Deleted');
@@ -399,10 +498,11 @@ async function saveEdit(pageId){
     return;
   }
   try {
+    const ownCreds = getOwnCreds();
     const res = await fetch('/.netlify/functions/notion-edit', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pageId, amount, category })
+      body: JSON.stringify({ pageId, amount, category, notionToken: ownCreds?.notionToken })
     });
     if(!res.ok) throw new Error('Failed to save');
     showToast('Updated ✓');
@@ -433,10 +533,33 @@ function renderBreakdown(byCategory){
   `).join('');
 }
 
+function renderTrend(entries){
+  const card = document.getElementById('trendCard');
+  const chart = document.getElementById('trendChart');
+  if(!entries.length){ card.style.display = 'none'; return; }
+
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
+  const byDay = new Array(daysInMonth).fill(0);
+  entries.forEach(e => {
+    const day = parseInt(e.date.slice(8,10), 10);
+    if(day >= 1 && day <= daysInMonth) byDay[day-1] += e.amount;
+  });
+  const max = Math.max(...byDay, 1);
+
+  card.style.display = 'block';
+  chart.innerHTML = byDay.map((amt, i) => {
+    const h = Math.max((amt/max*100), amt>0?6:2);
+    const isToday = (i+1) === new Date().getDate();
+    return `<div style="flex:1;height:${h}%;background:${isToday?'var(--violet)':'var(--violet-light)'};border-radius:3px;min-height:2px" title="Day ${i+1}: ₹${amt}"></div>`;
+  }).join('');
+}
+
 async function loadSummary(){
   const badge = document.getElementById('notionBadge');
   try {
-    const res = await fetch('/.netlify/functions/notion-summary');
+    const ownCreds = getOwnCreds();
+    const qs = ownCreds ? `?notionToken=${encodeURIComponent(ownCreds.notionToken)}&databaseId=${encodeURIComponent(ownCreds.databaseId)}` : '';
+    const res = await fetch('/.netlify/functions/notion-summary' + qs);
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Connection failed');
 
@@ -450,6 +573,7 @@ async function loadSummary(){
     if(savedBudget) document.getElementById('budgetInput').value = savedBudget;
     applyBudgetCheck();
     renderBreakdown(data.byCategory);
+    renderTrend(data.entries);
 
     const list = document.getElementById('entryList');
     if(!data.entries.length){
@@ -607,5 +731,23 @@ initLock();
 if(window.lucide) lucide.createIcons();
 loadSummary();
 </script>
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-sheet">
+    <div class="settings-title">Your Notion connection</div>
+    <div class="settings-sub" id="settingsSub">Each person using Spenno connects their own Notion — your data stays completely separate from anyone else's.</div>
+    <button class="settings-save" id="oauthConnectBtn" onclick="connectWithNotionOAuth()" style="background:#191A1E;margin-bottom:14px">
+      <i data-lucide="link" style="width:15px;height:15px;vertical-align:-3px;margin-right:6px"></i>Connect with Notion
+    </button>
+    <div style="text-align:center;color:var(--slate);font-size:12px;margin-bottom:14px">— or connect manually —</div>
+    <span class="settings-label">Notion token</span>
+    <input class="settings-input" id="settingsToken" type="password" placeholder="secret_..."/>
+    <span class="settings-label">Database ID</span>
+    <input class="settings-input" id="settingsDb" placeholder="32-character ID from your database URL"/>
+    <button class="settings-save" onclick="saveOwnNotion()">Connect my Notion</button>
+    <button class="settings-disconnect" id="disconnectBtn" style="display:none" onclick="disconnectOwnNotion()">Disconnect / Log out</button>
+    <button class="settings-close" onclick="closeSettings()">Close</button>
+  </div>
+</div>
+
 </body>
 </html>

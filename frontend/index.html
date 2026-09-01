@@ -363,7 +363,7 @@ function getOwnCreds(){
 
 // NOTE: replace YOUR_CLIENT_ID below with the Client ID from your public
 // Notion integration once created.
-const NOTION_OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID';
+const NOTION_OAUTH_CLIENT_ID = '3cad872b-594c-81e2-ae41-003741b91a25';
 
 function connectWithNotionOAuth(){
   const redirectUri = encodeURIComponent(location.origin + '/.netlify/functions/notion-oauth-callback');
@@ -732,7 +732,6 @@ function initLock(){
   }
 }
 initLock();
-
 if(window.lucide) lucide.createIcons();
 loadSummary();
 </script>

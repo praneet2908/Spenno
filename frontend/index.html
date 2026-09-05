@@ -1,4 +1,4 @@
-.<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -164,6 +164,26 @@
   </div>
   <div class="pin-pad" id="pinPad"></div>
   <button class="lock-hint" id="resetLink" onclick="resetPin()" style="display:none">Forgot PIN? Reset it</button>
+
+  <div id="connectRequiredScreen" style="display:none;text-align:center;max-width:340px">
+    <div class="lock-icon" style="margin:0 auto 20px;background:linear-gradient(155deg, var(--violet), var(--violet-deep))"><i data-lucide="sparkles" style="width:26px;height:26px"></i></div>
+    <div class="lock-title" style="font-size:23px">Welcome to Spenno</div>
+    <div class="lock-sub" style="margin-bottom:24px">Fast expense logging, built for how you actually spend.</div>
+    <div style="text-align:left;background:var(--card);border-radius:16px;padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow-md)">
+      <div style="display:flex;gap:12px;margin-bottom:14px;align-items:flex-start">
+        <i data-lucide="smartphone" style="width:18px;height:18px;color:var(--violet);flex-shrink:0;margin-top:2px"></i>
+        <div style="font-size:13.5px;color:var(--ink);line-height:1.4"><b>Your data stays on this device.</b> Nobody else using Spenno can see it — every device has its own separate, private data.</div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <i data-lucide="link" style="width:18px;height:18px;color:var(--violet);flex-shrink:0;margin-top:2px"></i>
+        <div style="font-size:13.5px;color:var(--ink);line-height:1.4"><b>Optionally sync to Notion.</b> Connect if you want a backup or want to view it in your own Notion workspace — totally optional, works fine without it too.</div>
+      </div>
+    </div>
+    <button class="settings-save" onclick="connectWithNotionOAuth()" style="background:var(--ink)">
+      <i data-lucide="link" style="width:15px;height:15px;vertical-align:-3px;margin-right:6px"></i>Connect with Notion
+    </button>
+    <button class="lock-hint" onclick="skipConnectForNow()" style="font-size:14px;font-weight:600;color:var(--violet);text-decoration:none;margin-top:4px">Skip — just use it on this device →</button>
+  </div>
 </div>
 
 <div class="wrap">
@@ -363,7 +383,7 @@ function getOwnCreds(){
 
 // NOTE: replace YOUR_CLIENT_ID below with the Client ID from your public
 // Notion integration once created.
-const NOTION_OAUTH_CLIENT_ID = '3cad872b-594c-81e2-ae41-003741b91a25';
+const NOTION_OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID';
 
 function connectWithNotionOAuth(){
   const redirectUri = encodeURIComponent(location.origin + '/.netlify/functions/notion-oauth-callback');
@@ -382,6 +402,7 @@ function checkOAuthReturn(){
       localStorage.setItem('spenno_own_db', db);
       history.replaceState(null, '', location.pathname);
       showToast('Connected to your Notion ✓');
+      unlockApp(); // in case this completed during the mandatory connect step
     }
   }
   const url = new URL(location.href);
@@ -394,10 +415,10 @@ checkOAuthReturn();
 
 function openSettings(){
   const creds = getOwnCreds();
-  document.getElementById('disconnectBtn').style.display = creds ? 'block' : 'none';
+  document.getElementById('disconnectBtn').style.display = 'block';
   document.getElementById('settingsSub').textContent = creds
-    ? "You're connected to your own Notion. Disconnect to switch to a different one."
-    : "Each person using Spenno connects their own Notion — your data stays completely separate from anyone else's.";
+    ? "Your data on this device also syncs to your connected Notion."
+    : "Your data is saved privately on this device. Connect Notion if you also want it backed up there.";
   document.getElementById('settingsOverlay').style.display = 'flex';
 }
 function closeSettings(){
@@ -424,96 +445,109 @@ function disconnectOwnNotion(){
   loadSummary();
 }
 
-async function addExpense(){
+function addExpense(){
   const amountInput = document.getElementById('amountInput');
   const noteInput = document.getElementById('noteInput');
-  const btn = document.getElementById('addBtn');
-  const amount = amountInput.value;
+  const amount = parseFloat(amountInput.value);
 
-  if(!amount || parseFloat(amount) <= 0){
+  if(!amount || amount <= 0){
     showToast('Enter an amount first', true);
     amountInput.focus();
     return;
   }
 
-  btn.disabled = true;
-  btn.innerHTML = 'Saving...';
+  const entry = {
+    id: uid(),
+    name: noteInput.value || selectedCat || 'Expense',
+    amount,
+    category: selectedCat,
+    date: new Date().toISOString().slice(0,10),
+    notionPageId: null
+  };
+  const all = getLocalExpenses();
+  all.push(entry);
+  saveLocalExpenses(all);
 
-  try {
-    const ownCreds = getOwnCreds();
-    const res = await fetch('/.netlify/functions/notion-add', {
+  showToast('Added ✓');
+  amountInput.value = '';
+  noteInput.value = '';
+  renderAll();
+
+  // Best-effort mirror to Notion, if connected - never blocks the local save
+  const ownCreds = getOwnCreds();
+  if(ownCreds){
+    fetch('/.netlify/functions/notion-add', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value, ...ownCreds })
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error || 'Failed to save');
-
-    // Best-effort mirror to Google Sheets - never blocks the main save
-    fetch('/.netlify/functions/sheets-add', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value })
+    }).then(r => r.json()).then(data => {
+      if(data.id){
+        const list = getLocalExpenses();
+        const found = list.find(e => e.id === entry.id);
+        if(found){ found.notionPageId = data.id; saveLocalExpenses(list); }
+      }
     }).catch(() => {});
-
-    showToast('Added to Notion ✓');
-    amountInput.value = '';
-    noteInput.value = '';
-    loadSummary();
-  } catch(err){
-    showToast(err.message || 'Something went wrong', true);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="plus" style="width:17px;height:17px"></i>Add to Notion';
-    if(window.lucide) lucide.createIcons();
   }
+
+  // Best-effort mirror to Google Sheets - never blocks either
+  fetch('/.netlify/functions/sheets-add', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ amount, category: selectedCat, note: noteInput.value })
+  }).catch(() => {});
 }
 
-async function deleteEntry(pageId){
+function deleteEntry(id){
   if(!confirm('Delete this expense?')) return;
-  try {
-    const ownCreds = getOwnCreds();
-    const res = await fetch('/.netlify/functions/notion-delete', {
+  const list = getLocalExpenses();
+  const entry = list.find(e => e.id === id);
+  const filtered = list.filter(e => e.id !== id);
+  saveLocalExpenses(filtered);
+  showToast('Deleted');
+  renderAll();
+
+  const ownCreds = getOwnCreds();
+  if(entry?.notionPageId && ownCreds){
+    fetch('/.netlify/functions/notion-delete', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pageId, notionToken: ownCreds?.notionToken })
-    });
-    if(!res.ok) throw new Error('Failed to delete');
-    showToast('Deleted');
-    loadSummary();
-  } catch(err){
-    showToast('Could not delete', true);
+      body: JSON.stringify({ pageId: entry.notionPageId, notionToken: ownCreds.notionToken })
+    }).catch(() => {});
   }
 }
 
-function startEdit(pageId){
+function startEdit(id){
   document.querySelectorAll('.edit-row').forEach(r => r.style.display = 'none');
   document.querySelectorAll('.entry').forEach(r => r.style.display = 'flex');
-  const editRow = document.getElementById('edit-'+pageId);
-  const entryRow = document.getElementById('entry-'+pageId);
+  const editRow = document.getElementById('edit-'+id);
+  const entryRow = document.getElementById('entry-'+id);
   entryRow.style.display = 'none';
   editRow.style.display = 'flex';
 }
 
-async function saveEdit(pageId){
-  const amount = document.getElementById('editAmt-'+pageId).value;
-  const category = document.getElementById('editCat-'+pageId).value;
-  if(!amount || parseFloat(amount) <= 0){
+function saveEdit(id){
+  const amount = parseFloat(document.getElementById('editAmt-'+id).value);
+  const category = document.getElementById('editCat-'+id).value;
+  if(!amount || amount <= 0){
     showToast('Enter a valid amount', true);
     return;
   }
-  try {
-    const ownCreds = getOwnCreds();
-    const res = await fetch('/.netlify/functions/notion-edit', {
+  const list = getLocalExpenses();
+  const entry = list.find(e => e.id === id);
+  if(!entry) return;
+  entry.amount = amount;
+  entry.category = category;
+  saveLocalExpenses(list);
+  showToast('Updated ✓');
+  renderAll();
+
+  const ownCreds = getOwnCreds();
+  if(entry.notionPageId && ownCreds){
+    fetch('/.netlify/functions/notion-edit', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pageId, amount, category, notionToken: ownCreds?.notionToken })
-    });
-    if(!res.ok) throw new Error('Failed to save');
-    showToast('Updated ✓');
-    loadSummary();
-  } catch(err){
-    showToast('Could not update', true);
+      body: JSON.stringify({ pageId: entry.notionPageId, amount, category, notionToken: ownCreds.notionToken })
+    }).catch(() => {});
   }
 }
 
@@ -559,60 +593,76 @@ function renderTrend(entries){
   }).join('');
 }
 
-async function loadSummary(){
+// --- Local-first data layer: every device's expenses live in its own ---
+// --- browser storage. Notion is an optional background mirror only.  ---
+function getLocalExpenses(){
+  return JSON.parse(localStorage.getItem('spenno_expenses') || '[]');
+}
+function saveLocalExpenses(list){
+  localStorage.setItem('spenno_expenses', JSON.stringify(list));
+}
+function uid(){
+  return 'e' + Date.now() + Math.random().toString(36).slice(2,8);
+}
+
+function renderAll(){
   const badge = document.getElementById('notionBadge');
-  try {
-    const ownCreds = getOwnCreds();
-    const qs = ownCreds ? `?notionToken=${encodeURIComponent(ownCreds.notionToken)}&databaseId=${encodeURIComponent(ownCreds.databaseId)}` : '';
-    const res = await fetch('/.netlify/functions/notion-summary' + qs);
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error || 'Connection failed');
+  const ownCreds = getOwnCreds();
+  badge.innerHTML = ownCreds
+    ? '<i data-lucide="check-circle-2" style="width:13px;height:13px"></i>Synced to Notion'
+    : '<i data-lucide="smartphone" style="width:13px;height:13px"></i>Saved on this device';
+  badge.classList.toggle('connected', !!ownCreds);
+  document.getElementById('setupNote').style.display = 'none';
 
-    currentData = data;
-    document.getElementById('totalNum').textContent = '₹' + data.total.toLocaleString('en-IN');
-    badge.innerHTML = '<i data-lucide="check-circle-2" style="width:13px;height:13px"></i>Connected';
-    badge.classList.add('connected');
-    document.getElementById('setupNote').style.display = 'none';
+  const now = new Date();
+  const monthPrefix = now.toISOString().slice(0,7); // "2026-08"
+  const all = getLocalExpenses();
+  const entries = all.filter(e => e.date.startsWith(monthPrefix)).sort((a,b) => b.date.localeCompare(a.date));
+  const total = entries.reduce((sum,e) => sum + e.amount, 0);
+  const byCategory = {};
+  entries.forEach(e => { byCategory[e.category] = (byCategory[e.category]||0) + e.amount; });
 
-    const savedBudget = getBudget();
-    if(savedBudget) document.getElementById('budgetInput').value = savedBudget;
-    applyBudgetCheck();
-    renderBreakdown(data.byCategory);
-    renderTrend(data.entries);
+  currentData = { entries, byCategory, total };
+  document.getElementById('totalNum').textContent = '₹' + total.toLocaleString('en-IN');
 
-    const list = document.getElementById('entryList');
-    if(!data.entries.length){
-      list.innerHTML = '<div style="color:var(--slate);font-size:14px;padding:16px 0">No expenses logged yet this month.</div>';
-    } else {
-      list.innerHTML = data.entries.slice(0,15).map(e => `
-        <div class="entry" id="entry-${e.id}">
-          <div class="entry-left">
-            <div class="entry-name">${e.name}</div>
-            <div class="entry-meta">${e.category} · ${e.date}</div>
-          </div>
-          <div class="entry-right">
-            <div class="entry-amt">₹${e.amount.toLocaleString('en-IN')}</div>
-            <div class="entry-actions">
-              <button class="icon-btn" onclick="startEdit('${e.id}')"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
-              <button class="icon-btn danger" onclick="deleteEntry('${e.id}')"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
-            </div>
+  const savedBudget = getBudget();
+  if(savedBudget) document.getElementById('budgetInput').value = savedBudget;
+  applyBudgetCheck();
+  renderBreakdown(byCategory);
+  renderTrend(entries);
+
+  const list = document.getElementById('entryList');
+  if(!entries.length){
+    list.innerHTML = '<div style="color:var(--slate);font-size:14px;padding:16px 0">No expenses logged yet this month.</div>';
+  } else {
+    list.innerHTML = entries.slice(0,20).map(e => `
+      <div class="entry" id="entry-${e.id}">
+        <div class="entry-left">
+          <div class="entry-name">${e.name}</div>
+          <div class="entry-meta">${e.category} · ${e.date}</div>
+        </div>
+        <div class="entry-right">
+          <div class="entry-amt">₹${e.amount.toLocaleString('en-IN')}</div>
+          <div class="entry-actions">
+            <button class="icon-btn" onclick="startEdit('${e.id}')"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
+            <button class="icon-btn danger" onclick="deleteEntry('${e.id}')"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
           </div>
         </div>
-        <div class="edit-row" id="edit-${e.id}">
-          <input type="number" id="editAmt-${e.id}" value="${e.amount}" placeholder="Amount"/>
-          <select id="editCat-${e.id}">
-            ${getCats().map(c => `<option value="${c}" ${c===e.category?'selected':''}>${c}</option>`).join('')}
-          </select>
-          <button class="edit-save" onclick="saveEdit('${e.id}')">Save</button>
-        </div>
-      `).join('');
-    }
-  } catch(err){
-    badge.innerHTML = '<i data-lucide="circle-x" style="width:13px;height:13px"></i>Not connected';
-    document.getElementById('setupNote').style.display = 'block';
+      </div>
+      <div class="edit-row" id="edit-${e.id}">
+        <input type="number" id="editAmt-${e.id}" value="${e.amount}" placeholder="Amount"/>
+        <select id="editCat-${e.id}">
+          ${getCats().map(c => `<option value="${c}" ${c===e.category?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <button class="edit-save" onclick="saveEdit('${e.id}')">Save</button>
+      </div>
+    `).join('');
   }
   if(window.lucide) lucide.createIcons();
 }
+
+// Kept as the name other code calls - now instant, local, no network wait
+function loadSummary(){ renderAll(); }
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW error:', e));
@@ -687,7 +737,7 @@ function handlePinComplete(){
     } else {
       if(pinEntry === setupFirstPin){
         localStorage.setItem('spenno_pin', pinEntry);
-        unlockApp();
+        showConnectRequired();
       } else {
         updateDots(true);
         showToast("PINs didn't match — try again", true);
@@ -715,11 +765,36 @@ function unlockApp(){
   document.getElementById('lockScreen').style.display = 'none';
 }
 
+function showConnectRequired(){
+  document.getElementById('pinPad').style.display = 'none';
+  document.getElementById('pinDots').style.display = 'none';
+  document.getElementById('lockTitle').style.display = 'none';
+  document.getElementById('lockSub').style.display = 'none';
+  document.querySelector('.lock-icon').style.display = 'none';
+  document.getElementById('connectRequiredScreen').style.display = 'block';
+  if(window.lucide) lucide.createIcons();
+}
+
+function skipConnectForNow(){
+  // User can still use Spenno without connecting - it'll just show
+  // whatever the app's default data source is until they connect later.
+  unlockApp();
+}
+
 function resetPin(){
   if(confirm('Reset your PIN? You will need to set a new one.')){
     localStorage.removeItem('spenno_pin');
     location.reload();
   }
+}
+
+function fullLogout(){
+  if(!confirm('Log out? This clears your PIN, your expenses on this device, and disconnects Notion.')) return;
+  localStorage.removeItem('spenno_pin');
+  localStorage.removeItem('spenno_own_token');
+  localStorage.removeItem('spenno_own_db');
+  localStorage.removeItem('spenno_expenses');
+  location.reload();
 }
 
 function initLock(){
@@ -732,6 +807,7 @@ function initLock(){
   }
 }
 initLock();
+
 if(window.lucide) lucide.createIcons();
 loadSummary();
 </script>
@@ -748,7 +824,7 @@ loadSummary();
     <span class="settings-label">Database ID</span>
     <input class="settings-input" id="settingsDb" placeholder="32-character ID from your database URL"/>
     <button class="settings-save" onclick="saveOwnNotion()">Connect my Notion</button>
-    <button class="settings-disconnect" id="disconnectBtn" style="display:none" onclick="disconnectOwnNotion()">Disconnect / Log out</button>
+    <button class="settings-disconnect" id="disconnectBtn" style="display:none" onclick="fullLogout()">Log out of Spenno</button>
     <button class="settings-close" onclick="closeSettings()">Close</button>
   </div>
 </div>

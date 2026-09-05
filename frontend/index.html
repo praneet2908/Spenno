@@ -131,6 +131,26 @@
   .settings-save{width:100%;background:var(--ink);color:#fff;border:none;padding:15px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:10px;}
   .settings-disconnect{width:100%;background:none;border:1.5px solid var(--coral);color:var(--coral);padding:13px;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;}
   .settings-close{width:100%;background:none;border:none;color:var(--slate);padding:10px;font-size:13px;cursor:pointer;margin-top:6px;}
+
+  .onboard-screen{position:fixed;inset:0;background:var(--paper);z-index:110;display:flex;flex-direction:column;padding:24px 24px 32px;}
+  .onboard-skip{align-self:flex-end;background:none;border:none;color:var(--slate);font-size:13px;font-weight:600;cursor:pointer;padding:8px;}
+  .onboard-slide{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:360px;margin:0 auto;width:100%;}
+  .onboard-slide.active{display:flex;}
+  .onboard-icon-wrap{width:76px;height:76px;border-radius:22px;background:linear-gradient(155deg, var(--violet), var(--violet-deep));display:flex;align-items:center;justify-content:center;color:#fff;margin-bottom:26px;box-shadow:var(--shadow-violet);}
+  .onboard-slide h2{font-family:'Sora';font-weight:800;font-size:25px;margin-bottom:12px;line-height:1.2;}
+  .onboard-slide p{color:var(--slate);font-size:14.5px;line-height:1.55;}
+  .onboard-steps{text-align:left;width:100%;margin-top:24px;}
+  .onboard-step{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px;}
+  .onboard-step-num{width:26px;height:26px;border-radius:8px;background:var(--violet-light);color:var(--violet);font-family:'Sora';font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .onboard-step div{font-size:13.5px;color:var(--ink);line-height:1.4;padding-top:3px;}
+  .onboard-trust-row{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--card);border-radius:14px;padding:14px 16px;margin-top:20px;box-shadow:var(--shadow-sm);}
+  .onboard-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(155deg, var(--mint), #1F8A65);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Sora';font-weight:800;font-size:22px;margin-bottom:16px;}
+  .onboard-footer{display:flex;flex-direction:column;gap:10px;max-width:360px;margin:20px auto 0;width:100%;}
+  .onboard-dots{display:flex;gap:7px;justify-content:center;margin-bottom:18px;}
+  .onboard-dot{width:7px;height:7px;border-radius:50%;background:var(--line);transition:all 0.2s;}
+  .onboard-dot.active{background:var(--violet);width:20px;border-radius:4px;}
+  .onboard-next{width:100%;background:var(--ink);color:#fff;border:none;padding:16px;border-radius:13px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Inter';box-shadow:0 4px 14px rgba(20,21,26,0.2);}
+  .onboard-back{background:none;border:none;color:var(--slate);font-size:13px;font-weight:600;cursor:pointer;padding:8px;text-align:center;}
   .pin-key.empty{visibility:hidden;}
   .lock-hint{margin-top:20px;font-size:12px;color:var(--slate);text-decoration:underline;cursor:pointer;background:none;border:none;}
 
@@ -155,6 +175,52 @@
 </head>
 <body>
 
+<div class="onboard-screen" id="onboardScreen">
+  <button class="onboard-skip" onclick="finishOnboarding()">Skip</button>
+
+  <div class="onboard-slide active" data-slide="0">
+    <div class="onboard-icon-wrap"><i data-lucide="zap" style="width:34px;height:34px"></i></div>
+    <h2>Spend fast, think later.</h2>
+    <p>Most expense trackers make logging a chore. Spenno is built to take under 5 seconds — so you actually keep doing it.</p>
+  </div>
+
+  <div class="onboard-slide" data-slide="1">
+    <div class="onboard-icon-wrap" style="background:linear-gradient(155deg, var(--mint), #1F8A65)"><i data-lucide="mouse-pointer-click" style="width:32px;height:32px"></i></div>
+    <h2>How it works</h2>
+    <div class="onboard-steps">
+      <div class="onboard-step"><div class="onboard-step-num">1</div><div>Tap an amount — type it or use a quick preset like ₹50 or ₹100</div></div>
+      <div class="onboard-step"><div class="onboard-step-num">2</div><div>Pick a category — or add your own in seconds</div></div>
+      <div class="onboard-step"><div class="onboard-step-num">3</div><div>Done. It's logged, with your monthly total and category breakdown updating instantly</div></div>
+    </div>
+  </div>
+
+  <div class="onboard-slide" data-slide="2">
+    <div class="onboard-icon-wrap" style="background:linear-gradient(155deg, #E8544A, #C23D34)"><i data-lucide="shield-check" style="width:32px;height:32px"></i></div>
+    <h2>Your data is yours</h2>
+    <p>Everything you log is saved privately, right on this device — nobody else using Spenno can ever see it.</p>
+    <div class="onboard-trust-row">
+      <i data-lucide="link" style="width:18px;height:18px;color:var(--violet);flex-shrink:0;margin-top:2px"></i>
+      <div style="font-size:13px;color:var(--ink);line-height:1.4"><b>Want a backup?</b> Optionally connect your own Notion anytime from Settings — one tap, nothing required.</div>
+    </div>
+  </div>
+
+    <div class="onboard-slide" data-slide="3">
+    <div class="onboard-avatar">P</div>
+    <h2>Hey, I'm Praneet Mallick, 👋</h2>
+    <p>I’m building Spenno : because tracking expenses shouldn’t feel like a chore.
+      I use Notion for everything, but logging daily spends from my phone was still annoying.
+      So I’m making a quick expense logger that sends every entry straight into your own Notion database—no separate ledger, no clutter.
+
+      Spenno is in early beta. I’m focusing on making it fast, simple, and actually useful for people who live in Notion.</p>
+  </div>
+
+  <div class="onboard-footer">
+    <div class="onboard-dots" id="onboardDots"></div>
+    <button class="onboard-next" id="onboardNextBtn" onclick="onboardNext()">Next</button>
+    <button class="onboard-back" id="onboardBackBtn" onclick="onboardBack()" style="visibility:hidden">Back</button>
+  </div>
+</div>
+
 <div class="lock-screen" id="lockScreen">
   <div class="lock-icon"><i data-lucide="lock" style="width:26px;height:26px"></i></div>
   <div class="lock-title" id="lockTitle">Enter PIN</div>
@@ -164,26 +230,6 @@
   </div>
   <div class="pin-pad" id="pinPad"></div>
   <button class="lock-hint" id="resetLink" onclick="resetPin()" style="display:none">Forgot PIN? Reset it</button>
-
-  <div id="connectRequiredScreen" style="display:none;text-align:center;max-width:340px">
-    <div class="lock-icon" style="margin:0 auto 20px;background:linear-gradient(155deg, var(--violet), var(--violet-deep))"><i data-lucide="sparkles" style="width:26px;height:26px"></i></div>
-    <div class="lock-title" style="font-size:23px">Welcome to Spenno</div>
-    <div class="lock-sub" style="margin-bottom:24px">Fast expense logging, built for how you actually spend.</div>
-    <div style="text-align:left;background:var(--card);border-radius:16px;padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow-md)">
-      <div style="display:flex;gap:12px;margin-bottom:14px;align-items:flex-start">
-        <i data-lucide="smartphone" style="width:18px;height:18px;color:var(--violet);flex-shrink:0;margin-top:2px"></i>
-        <div style="font-size:13.5px;color:var(--ink);line-height:1.4"><b>Your data stays on this device.</b> Nobody else using Spenno can see it — every device has its own separate, private data.</div>
-      </div>
-      <div style="display:flex;gap:12px;align-items:flex-start">
-        <i data-lucide="link" style="width:18px;height:18px;color:var(--violet);flex-shrink:0;margin-top:2px"></i>
-        <div style="font-size:13.5px;color:var(--ink);line-height:1.4"><b>Optionally sync to Notion.</b> Connect if you want a backup or want to view it in your own Notion workspace — totally optional, works fine without it too.</div>
-      </div>
-    </div>
-    <button class="settings-save" onclick="connectWithNotionOAuth()" style="background:var(--ink)">
-      <i data-lucide="link" style="width:15px;height:15px;vertical-align:-3px;margin-right:6px"></i>Connect with Notion
-    </button>
-    <button class="lock-hint" onclick="skipConnectForNow()" style="font-size:14px;font-weight:600;color:var(--violet);text-decoration:none;margin-top:4px">Skip — just use it on this device →</button>
-  </div>
 </div>
 
 <div class="wrap">
@@ -737,7 +783,7 @@ function handlePinComplete(){
     } else {
       if(pinEntry === setupFirstPin){
         localStorage.setItem('spenno_pin', pinEntry);
-        showConnectRequired();
+        unlockApp();
       } else {
         updateDots(true);
         showToast("PINs didn't match — try again", true);
@@ -765,20 +811,34 @@ function unlockApp(){
   document.getElementById('lockScreen').style.display = 'none';
 }
 
-function showConnectRequired(){
-  document.getElementById('pinPad').style.display = 'none';
-  document.getElementById('pinDots').style.display = 'none';
-  document.getElementById('lockTitle').style.display = 'none';
-  document.getElementById('lockSub').style.display = 'none';
-  document.querySelector('.lock-icon').style.display = 'none';
-  document.getElementById('connectRequiredScreen').style.display = 'block';
+// --- Onboarding slides (shown once, first-ever visit only) ---
+const TOTAL_SLIDES = 4;
+let currentSlide = 0;
+
+function renderOnboardSlide(){
+  document.querySelectorAll('.onboard-slide').forEach((s,i) => s.classList.toggle('active', i === currentSlide));
+  document.getElementById('onboardNextBtn').textContent = currentSlide === TOTAL_SLIDES-1 ? 'Get Started' : 'Next';
+  document.getElementById('onboardBackBtn').style.visibility = currentSlide === 0 ? 'hidden' : 'visible';
+  const dots = document.getElementById('onboardDots');
+  dots.innerHTML = Array.from({length: TOTAL_SLIDES}).map((_,i) =>
+    `<div class="onboard-dot ${i===currentSlide?'active':''}"></div>`
+  ).join('');
   if(window.lucide) lucide.createIcons();
 }
-
-function skipConnectForNow(){
-  // User can still use Spenno without connecting - it'll just show
-  // whatever the app's default data source is until they connect later.
-  unlockApp();
+function onboardNext(){
+  if(currentSlide === TOTAL_SLIDES-1){ finishOnboarding(); return; }
+  currentSlide++;
+  renderOnboardSlide();
+}
+function onboardBack(){
+  if(currentSlide === 0) return;
+  currentSlide--;
+  renderOnboardSlide();
+}
+function finishOnboarding(){
+  localStorage.setItem('spenno_onboarded', '1');
+  document.getElementById('onboardScreen').style.display = 'none';
+  initLock();
 }
 
 function resetPin(){
@@ -798,6 +858,7 @@ function fullLogout(){
 }
 
 function initLock(){
+  document.getElementById('lockScreen').style.display = 'flex';
   renderPinPad();
   if(pinMode === 'setup'){
     document.getElementById('lockTitle').textContent = 'Set a PIN';
@@ -806,7 +867,14 @@ function initLock(){
     document.getElementById('resetLink').style.display = 'block';
   }
 }
-initLock();
+
+if(localStorage.getItem('spenno_onboarded')){
+  document.getElementById('onboardScreen').style.display = 'none';
+  initLock();
+} else {
+  document.getElementById('lockScreen').style.display = 'none';
+  renderOnboardSlide();
+}
 
 if(window.lucide) lucide.createIcons();
 loadSummary();
@@ -830,4 +898,4 @@ loadSummary();
 </div>
 
 </body>
-</html>
+</html>s
